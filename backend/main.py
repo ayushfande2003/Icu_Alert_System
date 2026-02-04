@@ -27,8 +27,6 @@ from contextlib import asynccontextmanager
 from typing import Optional, List
 from io import BytesIO
 
-
-
 import cv2
 import numpy as np
 import requests
@@ -43,9 +41,17 @@ from sqlalchemy import func
 # Add backend directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+# Load environment variables from .env file
+from dotenv import load_dotenv
+env_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), '.env')
+if os.path.exists(env_path):
+    load_dotenv(env_path)
+    print("✅ Environment loaded from .env")
+
 # Import local modules
 from models.database import get_db, init_db, Base, engine
 from models.models import User, Patient, Vitals, Alert, AlertType, PatientStatus, SystemMetrics, UserRole
+from sqlalchemy import create_engine, text, inspect
 from models.schemas import (
     UserLogin, TokenResponse, PatientCreate, PatientUpdate, PatientResponse,
     VitalsCreate, VitalsResponse, AlertCreate, AlertResponse, AlertListResponse,
@@ -189,7 +195,6 @@ def sync_emit(event, data, room=None):
     if main_loop and main_loop.is_running():
         asyncio.run_coroutine_threadsafe(socketio.emit(event, data, room=room), main_loop)
     else:
-        # Fallback if loop not available (shouldn't happen if initialized correctly)
         pass
 
 
@@ -209,12 +214,10 @@ def camera_monitoring_thread():
             camera = cv2.VideoCapture(camera_url)
         else:
             print("📷 Using default camera")
-            # Try DSHOW backend for Windows first, it's often more stable
             if os.name == 'nt':
                 print("📷 Attempting to open camera with DSHOW...")
                 camera = cv2.VideoCapture(0, cv2.CAP_DSHOW)
                 
-                # Check if DSHOW worked
                 if not camera.isOpened():
                     print("⚠️ DSHOW backend failed. Retrying with default backend...")
                     camera = cv2.VideoCapture(0)
@@ -323,10 +326,6 @@ def camera_monitoring_thread():
             success_encode, buffer = cv2.imencode('.jpg', display_frame, [cv2.IMWRITE_JPEG_QUALITY, 80])
             if success_encode:
                 frame_base64 = base64.b64encode(buffer).decode('utf-8')
-            # Send frame to frontend
-            success_encode, buffer = cv2.imencode('.jpg', display_frame, [cv2.IMWRITE_JPEG_QUALITY, 80])
-            if success_encode:
-                frame_base64 = base64.b64encode(buffer).decode('utf-8')
                 sync_emit('video_frame', {
                     'frame': frame_base64,
                     'count': frame_count,
@@ -349,6 +348,108 @@ def camera_monitoring_thread():
         print("✅ Camera thread stopped")
 
 
+# ==================== Database Auto-Setup Functions ====================
+
+def get_database_url() -> str:
+    """Get database URL from environment or build from components."""
+    database_url = os.getenv("DATABASE_URL")
+    if not database_url:
+        db_user = os.getenv("DB_USER", "postgres")
+        db_password = os.getenv("DB_PASSWORD", "root")
+        db_host = os.getenv("DB_HOST", "localhost")
+        db_port = os.getenv("DB_PORT", "5432")
+        db_name = os.getenv("DB_NAME", "icu_alert_database")
+        database_url = f"postgresql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
+    return database_url
+
+
+def get_admin_engine():
+    """Create engine for connecting to PostgreSQL server."""
+    db_user = os.getenv("DB_USER", "postgres")
+    db_password = os.getenv("DB_PASSWORD", "root")
+    db_host = os.getenv("DB_HOST", "localhost")
+    db_port = os.getenv("DB_PORT", "5432")
+    admin_url = f"postgresql://{db_user}:{db_password}@{db_host}:{db_port}/postgres"
+    return create_engine(admin_url)
+
+
+def check_postgres_connection(admin_engine) -> tuple[bool, str]:
+    """Check if PostgreSQL server is accessible."""
+    try:
+        with admin_engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+        return True, "PostgreSQL server is accessible"
+    except Exception as e:
+        return False, f"Cannot connect to PostgreSQL server: {e}"
+
+
+def check_database_exists(admin_engine, db_name: str) -> tuple[bool, str]:
+    """Check if the target database exists."""
+    try:
+        with admin_engine.connect() as conn:
+            result = conn.execute(
+                text(f"SELECT 1 FROM pg_database WHERE datname = '{db_name}'")
+            )
+            exists = result.fetchone() is not None
+            if exists:
+                return True, f"Database '{db_name}' exists"
+            else:
+                return False, f"Database '{db_name}' does not exist"
+    except Exception as e:
+        return False, f"Error checking database: {e}"
+
+
+def create_database(admin_engine, db_name: str) -> tuple[bool, str]:
+    """Create the target database if it doesn't exist."""
+    try:
+        with admin_engine.connect() as conn:
+            conn.execute(
+                text(f"SELECT pg_terminate_backend(pid) FROM pg_stat_activity "
+                     f"WHERE datname = '{db_name}' AND pid <> pg_backend_pid()")
+            )
+            conn.commit()
+        
+        with admin_engine.connect() as conn:
+            conn.execute(text(f"CREATE DATABASE {db_name}"))
+            conn.commit()
+        
+        return True, f"Database '{db_name}' created successfully"
+    except Exception as e:
+        return False, f"Error creating database: {e}"
+
+
+def auto_setup_database():
+    """Automatically check and create database if needed."""
+    print("🗄️  Auto-setting up database...")
+    
+    database_url = get_database_url()
+    db_name = os.getenv("DB_NAME", "icu_alert_database")
+    
+    admin_engine = get_admin_engine()
+    
+    connected, message = check_postgres_connection(admin_engine)
+    if not connected:
+        print(f"❌ Database connection failed: {message}")
+        return False
+    
+    print(f"   {message}")
+    
+    db_exists, db_message = check_database_exists(admin_engine, db_name)
+    if db_exists:
+        print(f"   ✅ {db_message}")
+    else:
+        print(f"   ℹ️  {db_message}")
+        created, create_message = create_database(admin_engine, db_name)
+        if created:
+            print(f"   ✅ {create_message}")
+        else:
+            print(f"   ❌ {create_message}")
+            return False
+    
+    print("✅ Database auto-setup complete!")
+    return True
+
+
 # ==================== Application Lifecycle ====================
 
 @asynccontextmanager
@@ -360,11 +461,17 @@ async def lifespan(app: FastAPI):
     main_loop = asyncio.get_running_loop()
     
     # Startup
-    
-    # Startup
     print("🚀 Starting SafeSign ICU Monitoring System...")
-    print("📊 Initializing database...")
+    
+    # Auto-setup database (check and create if needed)
+    db_ready = auto_setup_database()
+    if not db_ready:
+        print("❌ Database setup failed. Application may not function correctly.")
+    
+    # Initialize database tables
+    print("📊 Creating database tables...")
     init_db()
+    print("✅ Database tables ready")
     
     # Create demo users
     db = next(get_db())
@@ -415,8 +522,6 @@ app.add_middleware(
 )
 
 # SocketIO
-# SocketIO
-# Mount at /ws to avoid conflict with root static files and API
 socketio = SocketManager(app=app, mount_location="/ws", socketio_path="/socket.io")
 
 # Mount static files
@@ -513,9 +618,6 @@ async def health_check():
 async def login(user_login: UserLogin, db: Session = Depends(get_db)):
     """
     Authenticate user and return JWT tokens.
-    
-    - **username**: User's username
-    - **password**: User's password
     """
     auth_service = AuthService(db)
     
@@ -531,11 +633,7 @@ async def login(user_login: UserLogin, db: Session = Depends(get_db)):
 
 @app.post("/api/auth/refresh", response_model=TokenResponse, tags=["Authentication"])
 async def refresh_token(refresh_token: str):
-    """
-    Refresh access token using refresh token.
-    
-    - **refresh_token**: Valid refresh token
-    """
+    """Refresh access token using refresh token."""
     try:
         from auth.jwt_handler import refresh_access_token, decode_token
         payload = decode_token(refresh_token)
@@ -566,7 +664,7 @@ async def refresh_token(refresh_token: str):
 
 @app.post("/api/auth/logout", tags=["Authentication"])
 async def logout(current_user: User = Depends(get_current_user)):
-    """Logout user (client-side token cleanup)."""
+    """Logout user."""
     return {"message": "Successfully logged out"}
 
 
@@ -574,13 +672,9 @@ async def logout(current_user: User = Depends(get_current_user)):
 
 @app.get("/api/patient", response_model=dict, tags=["Patients"])
 async def get_patient(db: Session = Depends(get_db)):
-    """
-    Get current patient information.
-    Returns demo patient for development.
-    """
+    """Get current patient information."""
     patient_crud = PatientCRUD(db)
     
-    # For demo, return first patient or create one
     patient = patient_crud.get_by_patient_id("ICU-A-12")
     if not patient:
         patient_data = PatientCreate(
@@ -628,17 +722,13 @@ async def create_patient(
 
 @app.get("/api/vitals", response_model=dict, tags=["Vitals"])
 async def get_vitals(db: Session = Depends(get_db)):
-    """
-    Get current patient vitals.
-    Returns demo vitals for development.
-    """
+    """Get current patient vitals."""
     vitals_crud = VitalsCRUD(db)
     latest = vitals_crud.get_latest(patient_id=1)
     
     if latest:
         return vitals_crud.to_response(latest)
     
-    # Return demo vitals
     return {
         "heartRate": 78,
         "oxygen": 97,
@@ -775,7 +865,7 @@ async def get_patient_trends(
 async def get_system_performance():
     """Get system performance metrics."""
     return SystemPerformance(
-        cpu_usage=None,  # Would require psutil
+        cpu_usage=None,
         memory_usage=None,
         disk_usage=None,
         active_connections=1,
@@ -829,7 +919,6 @@ async def serve_frontend_path(path: str):
     if os.path.exists(file_path) and not file_path.endswith(('.py', '.db')):
         return FileResponse(file_path)
     
-    # Return index.html for SPA routing
     index_path = os.path.join(frontend_path, "index.html")
     if os.path.exists(index_path):
         return FileResponse(index_path)
