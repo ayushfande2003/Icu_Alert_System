@@ -1,0 +1,46 @@
+# FastAPI dependencies
+fastapi
+uvicorn[standard]
+python-multipart
+
+# WebSocket support
+python-socketio[client]
+python-socketio
+fastapi-socketio
+eventlet
+
+# Database
+sqlalchemy
+alembic
+psycopg2-binary
+
+# Authentication
+python-jose[cryptography]
+passlib[bcrypt]
+
+# Data validation
+pydantic
+pydantic-settings
+email-validator
+
+# HTTP client
+httpx
+requests
+
+# Computer Vision (existing dependencies)
+opencv-python-headless
+numpy
+
+# CORS
+fastapi-cors
+
+# Configuration
+pyyaml
+python-dotenv
+
+# Testing
+pytest
+pytest-asyncio
+
+# Utilities
+python-dateutil

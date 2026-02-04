@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SafeSign - Login</title>
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <style>
+        :root {
+            --primary: #3b82f6;
+            --primary-dark: #2563eb;
+            --secondary: #8b5cf6;
+            --accent: #06b6d4;
+            --success: #10b981;
+            --danger: #ef4444;
+            --text-main: #1f2937;
+            --text-muted: #6b7280;
+            --glass-bg: rgba(255, 255, 255, 0.75);
+            --glass-border: rgba(255, 255, 255, 0.5);
+            --shadow-lg: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+            --radius-xl: 1.5rem;
+            --radius-md: 0.75rem;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background: #0f172a;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1rem;
+            position: relative;
+            overflow-x: hidden;
+        }
+
+        /* Animated Background */
+        .bg-orbit {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            top: 0;
+            left: 0;
+            z-index: -1;
+            overflow: hidden;
+        }
+
+        .bg-orbit::before,
+        .bg-orbit::after {
+            content: '';
+            position: absolute;
+            width: 600px;
+            height: 600px;
+            border-radius: 50%;
+            filter: blur(80px);
+            opacity: 0.6;
+            animation: orbit 20s linear infinite;
+        }
+
+        .bg-orbit::before {
+            background: linear-gradient(to right, var(--primary), var(--accent));
+            top: -100px;
+            left: -100px;
+        }
+
+        .bg-orbit::after {
+            background: linear-gradient(to right, var(--secondary), var(--primary-dark));
+            bottom: -100px;
+            right: -100px;
+            animation-delay: -10s;
+        }
+
+        @keyframes orbit {
+            0% {
+                transform: translate(0, 0) scale(1);
+            }
+
+            33% {
+                transform: translate(100px, 100px) scale(1.1);
+            }
+
+            66% {
+                transform: translate(-50px, 50px) scale(0.9);
+            }
+
+            100% {
+                transform: translate(0, 0) scale(1);
+            }
+        }
+
+        .login-card {
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius-xl);
+            box-shadow: var(--shadow-lg);
+            width: 100%;
+            max-width: 450px;
+            padding: 2.5rem;
+            transform: translateY(20px);
+            animation: floatUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+
+        @keyframes floatUp {
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        .header h1 {
+            font-size: 2rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--primary-dark), var(--secondary));
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 0.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+
+        .header p {
+            color: var(--text-muted);
+            font-size: 0.95rem;
+        }
+
+        /* Role Selection */
+        .role-label {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            margin-bottom: 0.75rem;
+            display: block;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .role-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 0.75rem;
+            margin-bottom: 2rem;
+        }
+
+        .role-card {
+            background: rgba(255, 255, 255, 0.5);
+            border: 2px solid transparent;
+            border-radius: var(--radius-md);
+            padding: 0.75rem 0.25rem;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .role-card:hover {
+            transform: translateY(-2px);
+            background: rgba(255, 255, 255, 0.8);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        .role-card.active {
+            border-color: var(--primary);
+            background: rgba(59, 130, 246, 0.1);
+            color: var(--primary-dark);
+        }
+
+        .role-card i {
+            font-size: 1.25rem;
+            margin-bottom: 0.25rem;
+            display: block;
+        }
+
+        .role-card span {
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .role-check {
+            position: absolute;
+            top: 4px;
+            right: 4px;
+            font-size: 0.75rem;
+            color: var(--primary);
+            opacity: 0;
+            transform: scale(0);
+            transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        .role-card.active .role-check {
+            opacity: 1;
+            transform: scale(1);
+        }
+
+        /* Form Controls */
+        .form-group {
+            margin-bottom: 1.25rem;
+            position: relative;
+        }
+
+        .form-group label {
+            position: absolute;
+            left: 1rem;
+            top: 1rem;
+            padding: 0 0.25rem;
+            color: var(--text-muted);
+            font-size: 1rem;
+            transition: all 0.2s ease;
+            pointer-events: none;
+            background: transparent;
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 1rem 1rem;
+            padding-top: 1.5rem;
+            /* space for label */
+            padding-bottom: 0.5rem;
+            border: 1px solid #e5e7eb;
+            border-radius: var(--radius-md);
+            background: rgba(255, 255, 255, 0.6);
+            font-size: 1rem;
+            font-family: inherit;
+            color: var(--text-main);
+            transition: all 0.2s;
+        }
+
+        .form-control:focus {
+            outline: none;
+            border-color: var(--primary);
+            background: #fff;
+            box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
+        }
+
+        .form-control:focus+label,
+        .form-control:not(:placeholder-shown)+label {
+            top: 0.25rem;
+            font-size: 0.75rem;
+            color: var(--primary);
+            font-weight: 600;
+        }
+
+        .form-control::placeholder {
+            color: transparent;
+        }
+
+        /* Button */
+        .btn-submit {
+            width: 100%;
+            padding: 1rem;
+            border: none;
+            border-radius: var(--radius-md);
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: white;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.75rem;
+            box-shadow: 0 4px 6px -1px rgba(59, 130, 246, 0.3);
+        }
+
+        .btn-submit:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 15px -3px rgba(59, 130, 246, 0.4);
+            background: linear-gradient(135deg, #60a5fa, var(--primary));
+        }
+
+        .btn-submit:active {
+            transform: translateY(0);
+        }
+
+        .loading-spinner {
+            width: 20px;
+            height: 20px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 0.8s linear infinite;
+            display: none;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        /* Alerts */
+        .alert {
+            padding: 1rem;
+            border-radius: var(--radius-md);
+            margin-bottom: 1.5rem;
+            display: none;
+            font-size: 0.9rem;
+            display: flex;
+            /* Initially hidden via style="display:none" below, but flex when shown */
+            align-items: center;
+            gap: 0.75rem;
+            animation: slideDown 0.3s ease;
+        }
+
+        .alert[style*="display: none"] {
+            display: none !important;
+        }
+
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .alert-error {
+            background: rgba(254, 226, 226, 0.9);
+            border: 1px solid rgba(248, 113, 113, 0.5);
+            color: #b91c1c;
+        }
+
+        .alert-success {
+            background: rgba(209, 250, 229, 0.9);
+            border: 1px solid rgba(16, 185, 129, 0.5);
+            color: #047857;
+        }
+
+        /* Demo Credentials */
+        .demo-box {
+            margin-top: 2rem;
+            padding: 1.5rem;
+            background: rgba(243, 244, 246, 0.6);
+            border-radius: var(--radius-md);
+            border: 1px dashed #cbd5e1;
+        }
+
+        .demo-title {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+            margin-bottom: 0.75rem;
+            font-weight: 700;
+        }
+
+        .credential-list {
+            display: grid;
+            gap: 0.5rem;
+            font-size: 0.85rem;
+            color: var(--text-main);
+        }
+
+        .cred-row {
+            display: flex;
+            justify-content: space-between;
+            padding-bottom: 0.25rem;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+        }
+
+        .cred-row:last-child {
+            border-bottom: none;
+        }
+
+        .cred-role {
+            font-weight: 600;
+            color: var(--primary-dark);
+        }
+
+        .cred-val {
+            font-family: 'Courier New', monospace;
+        }
+
+        /* Responsive */
+        @media (max-width: 480px) {
+            .login-card {
+                padding: 1.5rem;
+            }
+
+            .role-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="bg-orbit"></div>
+
+    <div class="login-card">
+        <div class="header">
+            <h1>
+                <i class="fas fa-heartbeat"></i>
+                SafeSign
+            </h1>
+            <p>Advanced ICU Monitoring System</p>
+        </div>
+
+        <div class="alert alert-error" id="errorAlert" style="display: none;">
+            <i class="fas fa-exclamation-circle"></i>
+            <span id="errorMessage">Invalid credentials provided.</span>
+        </div>
+
+        <form id="loginForm">
+            <span class="role-label">Select Access Role</span>
+            <div class="role-grid">
+                <div class="role-card active" data-role="admin">
+                    <i class="fas fa-shield-alt"></i>
+                    <span>Admin</span>
+                    <i class="fas fa-check-circle role-check"></i>
+                </div>
+                <div class="role-card" data-role="doctor">
+                    <i class="fas fa-user-md"></i>
+                    <span>Doctor</span>
+                    <i class="fas fa-check-circle role-check"></i>
+                </div>
+                <div class="role-card" data-role="nurse">
+                    <i class="fas fa-user-nurse"></i>
+                    <span>Nurse</span>
+                    <i class="fas fa-check-circle role-check"></i>
+                </div>
+                <div class="role-card" data-role="family">
+                    <i class="fas fa-users"></i>
+                    <span>Family</span>
+                    <i class="fas fa-check-circle role-check"></i>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <input type="text" id="username" class="form-control" placeholder="username" required>
+                <label for="username"><i class="far fa-user"></i> Username</label>
+            </div>
+
+            <div class="form-group">
+                <input type="password" id="password" class="form-control" placeholder="password" required>
+                <label for="password"><i class="fas fa-lock"></i> Password</label>
+            </div>
+
+            <button type="submit" class="btn-submit" id="loginBtn">
+                <span class="loading-spinner"></span>
+                <span class="btn-text">Sign In Securely</span>
+                <i class="fas fa-arrow-right"></i>
+            </button>
+        </form>
+
+        <div class="demo-box">
+            <div class="demo-title">For Demonstration</div>
+            <div class="credential-list">
+                <div class="cred-row">
+                    <span class="cred-role">Admin</span>
+                    <span class="cred-val">admin / admin123</span>
+                </div>
+                <div class="cred-row">
+                    <span class="cred-role">Doctor</span>
+                    <span class="cred-val">doctor / doctor123</span>
+                </div>
+                <div class="cred-row">
+                    <span class="cred-role">Nurse</span>
+                    <span class="cred-val">nurse / nurse123</span>
+                </div>
+                <div class="cred-row">
+                    <span class="cred-role">Family</span>
+                    <span class="cred-val">family / family123</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Maintain compatibility with existing logic -->
+    <script src="js/auth.js?v=3"></script>
+</body>
+
+</html>

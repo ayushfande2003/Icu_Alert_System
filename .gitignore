@@ -1,0 +1,55 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+
+# Environment
+venv/
+env/
+.venv/
+node_modules/
+.env
+.ENV
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+*.db-journal
+
+# IDE and Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Logs
+*.log
+logs/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.coveragerc
+cover/
+
+# Uploads (if any)
+uploads/
+static/uploads/
+
+# Generated
+*.pem
+*.key
+*.crt
+
+# OS
+Thumbs.db
+

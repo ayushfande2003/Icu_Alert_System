@@ -1,0 +1,1047 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SafeSign - Admin Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <style>
+        :root {
+            --primary: #1E88E5;
+            --alert-red: #E53935;
+            --success-green: #43A047;
+            --warning-yellow: #FFA726;
+            --bg-dark: #121212;
+            --bg-light: #F5F5F5;
+            --card-dark: #1E1E1E;
+            --card-light: #FFFFFF;
+            --text-dark: #E0E0E0;
+            --text-light: #212121;
+            --shadow: rgba(0, 0, 0, 0.2);
+            --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Poppins', sans-serif;
+            background: var(--bg-light);
+            color: var(--text-light);
+            transition: var(--transition);
+            overflow-x: hidden;
+        }
+
+        body.dark-mode {
+            background: var(--bg-dark);
+            color: var(--text-dark);
+        }
+
+        .header {
+            background: linear-gradient(135deg, var(--primary), #1565C0);
+            padding: 1.5rem 2rem;
+            box-shadow: 0 4px 20px var(--shadow);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .header-content {
+            max-width: 1400px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+
+        .header h1 {
+            color: white;
+            font-size: 1.8rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .header-controls {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .theme-toggle,
+        .logout-btn {
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            padding: 0.6rem 1rem;
+            border-radius: 50px;
+            color: white;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: var(--transition);
+            backdrop-filter: blur(10px);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .theme-toggle:hover,
+        .logout-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: scale(1.05);
+        }
+
+        .user-info {
+            color: white;
+            font-size: 0.9rem;
+            opacity: 0.9;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 2rem auto;
+            padding: 0 1rem;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .card {
+            background: var(--card-light);
+            border-radius: 16px;
+            padding: 1.5rem;
+            box-shadow: 0 4px 20px var(--shadow);
+            transition: var(--transition);
+        }
+
+        body.dark-mode .card {
+            background: var(--card-dark);
+        }
+
+        .card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 30px var(--shadow);
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+            padding-bottom: 0.75rem;
+            border-bottom: 2px solid rgba(0, 0, 0, 0.1);
+        }
+
+        body.dark-mode .card-header {
+            border-bottom-color: rgba(255, 255, 255, 0.1);
+        }
+
+        .card-title {
+            font-size: 1.2rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, rgba(30, 136, 229, 0.1), rgba(30, 136, 229, 0.05));
+            padding: 1.5rem;
+            border-radius: 12px;
+            text-align: center;
+            border-left: 4px solid var(--primary);
+        }
+
+        .stat-value {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+
+        .stat-label {
+            font-size: 0.9rem;
+            opacity: 0.7;
+        }
+
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 12px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px var(--shadow);
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary), #1565C0);
+            color: white;
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, var(--success-green), #2E7D32);
+            color: white;
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, var(--alert-red), #C62828);
+            color: white;
+        }
+
+        .btn-warning {
+            background: linear-gradient(135deg, var(--warning-yellow), #F57C00);
+            color: white;
+        }
+
+        .controls-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .system-status {
+            background: linear-gradient(135deg, rgba(67, 160, 71, 0.1), rgba(67, 160, 71, 0.05));
+            padding: 1.5rem;
+            border-radius: 12px;
+            border-left: 4px solid var(--success-green);
+        }
+
+        .status-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.5rem 0;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+        }
+
+        body.dark-mode .status-item {
+            border-bottom-color: rgba(255, 255, 255, 0.1);
+        }
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: var(--success-green);
+        }
+
+        .status-dot.warning {
+            background: var(--warning-yellow);
+        }
+
+        .status-dot.error {
+            background: var(--alert-red);
+        }
+
+        /* Debug Panel Styles */
+        .debug-panel {
+            background: #f8f9fa;
+            border: 2px dashed #6c757d;
+            padding: 1.5rem;
+            border-radius: 12px;
+            margin-top: 1rem;
+        }
+
+        body.dark-mode .debug-panel {
+            background: #2d3748;
+            border-color: #4a5568;
+        }
+
+        .debug-log {
+            background: #1e1e1e;
+            color: #00ff00;
+            padding: 1rem;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.8rem;
+            max-height: 200px;
+            overflow-y: auto;
+            margin-top: 1rem;
+            border: 1px solid #333;
+        }
+
+        .debug-controls {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+            margin-bottom: 1rem;
+        }
+
+        .video-preview {
+            width: 100%;
+            height: 200px;
+            background: #000;
+            border-radius: 8px;
+            overflow: hidden;
+            margin: 1rem 0;
+            border: 2px solid #ddd;
+        }
+
+        .video-preview img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .video-placeholder {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            color: #666;
+        }
+
+        .health-indicator {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-right: 0.5rem;
+        }
+
+        .health-good {
+            background: var(--success-green);
+        }
+
+        .health-warning {
+            background: var(--warning-yellow);
+        }
+
+        .health-error {
+            background: var(--alert-red);
+        }
+
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 1.3rem;
+            }
+
+            .container {
+                gap: 1rem;
+            }
+
+            .debug-controls {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <header class="header">
+        <div class="header-content">
+            <h1>
+                <i class="fas fa-cogs"></i>
+                SafeSign - Admin Panel
+            </h1>
+            <div class="header-controls">
+                <div class="user-info">
+                    <i class="fas fa-user-shield"></i>
+                    <span id="userName">System Administrator</span>
+                </div>
+                <button class="theme-toggle" id="themeToggle">
+                    <i class="fas fa-moon"></i>
+                </button>
+                <button class="logout-btn" id="logoutBtn">
+                    <i class="fas fa-sign-out-alt"></i>
+                    Logout
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <div class="container">
+        <!-- System Overview -->
+        <div class="card">
+            <div class="card-header">
+                <h2 class="card-title">
+                    <i class="fas fa-tachometer-alt"></i>
+                    System Overview
+                </h2>
+            </div>
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-value" id="totalPatients">12</div>
+                    <div class="stat-label">Total Patients</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="activeAlerts">3</div>
+                    <div class="stat-label">Active Alerts</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="onlineCameras">8</div>
+                    <div class="stat-label">Online Cameras</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="systemUptime">99.8%</div>
+                    <div class="stat-label">System Uptime</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- System Diagnostics -->
+        <div class="card" style="grid-column: span 2;">
+            <div class="card-header">
+                <h2 class="card-title">
+                    <i class="fas fa-stethoscope"></i>
+                    System Diagnostics
+                </h2>
+            </div>
+
+            <div class="debug-panel">
+                <h3 style="margin-bottom: 1rem; color: #6c757d;">
+                    <i class="fas fa-bug"></i> Real-time System Monitoring
+                </h3>
+
+                <div class="debug-controls">
+                    <button class="btn btn-warning" onclick="testCamera()">
+                        <i class="fas fa-camera"></i> Test Camera
+                    </button>
+                    <button class="btn btn-warning" onclick="testWebSocket()">
+                        <i class="fas fa-plug"></i> Test WebSocket
+                    </button>
+                    <button class="btn btn-warning" onclick="testBackend()">
+                        <i class="fas fa-server"></i> Test Backend API
+                    </button>
+                    <button class="btn btn-success" onclick="testTelegram()">
+                        <i class="fab fa-telegram"></i> Test Telegram
+                    </button>
+                    <button class="btn btn-primary" onclick="startAIMonitoring()">
+                        <i class="fas fa-brain"></i> Start AI Monitor
+                    </button>
+                    <button class="btn btn-danger" onclick="stopAIMonitoring()">
+                        <i class="fas fa-stop"></i> Stop AI Monitor
+                    </button>
+                    <button class="btn btn-primary" onclick="clearDebugLog()">
+                        <i class="fas fa-trash"></i> Clear Log
+                    </button>
+                </div>
+
+                <!-- Camera Preview -->
+                <div class="video-preview">
+                    <img id="videoPreview" style="display: none;">
+                    <div class="video-placeholder" id="videoPlaceholder">
+                        <i class="fas fa-camera-slash" style="font-size: 2rem;"></i>
+                        <p>Camera preview will appear here</p>
+                        <small>Click "Test Camera" or "Start AI Monitor"</small>
+                    </div>
+                </div>
+
+                <!-- System Health -->
+                <div
+                    style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin: 1rem 0;">
+                    <div class="status-item">
+                        <span>Backend API</span>
+                        <span id="backendStatus"><span class="health-indicator health-warning"></span>Testing...</span>
+                    </div>
+                    <div class="status-item">
+                        <span>WebSocket</span>
+                        <span id="websocketStatus"><span
+                                class="health-indicator health-warning"></span>Testing...</span>
+                    </div>
+                    <div class="status-item">
+                        <span>Camera Feed</span>
+                        <span id="cameraStatus"><span class="health-indicator health-warning"></span>Testing...</span>
+                    </div>
+                    <div class="status-item">
+                        <span>Telegram Bot</span>
+                        <span id="telegramStatus"><span class="health-indicator health-warning"></span>Testing...</span>
+                    </div>
+                </div>
+
+                <!-- Debug Log -->
+                <div class="debug-log" id="debugLog">
+                    <div>🔧 System Diagnostics Ready...</div>
+                    <div>💡 Click diagnostic buttons to test system components</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- System Controls -->
+        <div class="card">
+            <div class="card-header">
+                <h2 class="card-title">
+                    <i class="fas fa-sliders-h"></i>
+                    System Controls
+                </h2>
+            </div>
+            <div class="controls-panel">
+                <button class="btn btn-primary" id="systemRestart">
+                    <i class="fas fa-redo"></i>
+                    Restart Monitoring System
+                </button>
+                <button class="btn btn-primary" id="backupSystem">
+                    <i class="fas fa-database"></i>
+                    Backup System Data
+                </button>
+                <button class="btn btn-success" id="addUser">
+                    <i class="fas fa-user-plus"></i>
+                    Add New User
+                </button>
+                <button class="btn btn-danger" id="systemSettings">
+                    <i class="fas fa-cog"></i>
+                    System Settings
+                </button>
+            </div>
+        </div>
+
+        <!-- System Status -->
+        <div class="card">
+            <div class="card-header">
+                <h2 class="card-title">
+                    <i class="fas fa-heartbeat"></i>
+                    System Status
+                </h2>
+            </div>
+            <div class="system-status">
+                <div class="status-item">
+                    <span>Backend Server</span>
+                    <div class="status-dot" id="backendDot"></div>
+                </div>
+                <div class="status-item">
+                    <span>Database</span>
+                    <div class="status-dot" id="databaseDot"></div>
+                </div>
+                <div class="status-item">
+                    <span>AI Processing</span>
+                    <div class="status-dot" id="aiDot"></div>
+                </div>
+                <div class="status-item">
+                    <span>Camera Systems</span>
+                    <div class="status-dot warning" id="cameraDot"></div>
+                </div>
+                <div class="status-item">
+                    <span>Alert System</span>
+                    <div class="status-dot" id="alertDot"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- User Management -->
+        <div class="card">
+            <div class="card-header">
+                <h2 class="card-title">
+                    <i class="fas fa-users"></i>
+                    User Management
+                </h2>
+            </div>
+            <div class="controls-panel">
+                <button class="btn btn-primary" id="viewUsers">
+                    <i class="fas fa-list"></i>
+                    View All Users
+                </button>
+                <button class="btn btn-success" id="createUser">
+                    <i class="fas fa-plus"></i>
+                    Create User Account
+                </button>
+                <button class="btn btn-danger" id="auditLogs">
+                    <i class="fas fa-clipboard-list"></i>
+                    View Audit Logs
+                </button>
+            </div>
+        </div>
+
+        <!-- Recent Activity -->
+        <div class="card" style="grid-column: span 2;">
+            <div class="card-header">
+                <h2 class="card-title">
+                    <i class="fas fa-history"></i>
+                    System Activity Log
+                </h2>
+            </div>
+            <div id="activityLogs">
+                <div class="status-item">
+                    <span>System diagnostics panel initialized</span>
+                    <small>Just now</small>
+                </div>
+                <div class="status-item">
+                    <span>Admin user logged in</span>
+                    <small>2 minutes ago</small>
+                </div>
+                <div class="status-item">
+                    <span>System started successfully</span>
+                    <small>5 minutes ago</small>
+                </div>
+            </div>
+        </div>
+    </div>
+    <button class="btn btn-warning" onclick="debugTelegramIssue()" style="margin-top: 10px;">
+        <i class="fas fa-bug"></i>
+        Debug Telegram Issue
+    </button>
+    <script>
+        let socket = null;
+        const debugLog = document.getElementById('debugLog');
+
+        // Debug logging function
+        function logDebug(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const icon = type === 'error' ? '❌' : type === 'success' ? '✅' : '🔧';
+            debugLog.innerHTML += `<div>${icon} [${timestamp}] ${message}</div>`;
+            debugLog.scrollTop = debugLog.scrollHeight;
+            console.log(`[${type.toUpperCase()}] ${message}`);
+        }
+
+        function clearDebugLog() {
+            debugLog.innerHTML = '<div>🔧 Debug log cleared...</div>';
+        }
+
+        function updateHealthIndicator(elementId, status) {
+            const element = document.getElementById(elementId);
+            if (!element) {
+                console.error('Element not found:', elementId);
+                return;
+            }
+
+            // Clear existing content
+            element.innerHTML = '';
+
+            // Create health indicator
+            const indicator = document.createElement('span');
+            indicator.className = 'health-indicator';
+
+            if (status === 'good') {
+                indicator.classList.add('health-good');
+                element.appendChild(indicator);
+                element.appendChild(document.createTextNode(' Online'));
+            } else if (status === 'warning') {
+                indicator.classList.add('health-warning');
+                element.appendChild(indicator);
+                element.appendChild(document.createTextNode(' Testing...'));
+            } else if (status === 'error') {
+                indicator.classList.add('health-error');
+                element.appendChild(indicator);
+                element.appendChild(document.createTextNode(' Offline'));
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', function () {
+            logDebug('🚀 Admin Dashboard Loaded - Diagnostics Ready');
+
+            // Check authentication
+            const userData = localStorage.getItem('currentUser');
+            if (!userData) {
+                window.location.href = 'index.html';
+                return;
+            }
+
+            const user = JSON.parse(userData);
+            if (user.role !== 'admin') {
+                alert('Access denied. Admin privileges required.');
+                window.location.href = 'index.html';
+                return;
+            }
+
+            document.getElementById('userName').textContent = user.name || 'System Administrator';
+
+            setupEventListeners();
+            initTheme();
+            initWebSocket();
+            runInitialDiagnostics();
+        });
+
+        function setupEventListeners() {
+            document.getElementById('themeToggle').addEventListener('click', function () {
+                document.body.classList.toggle('dark-mode');
+                const isDark = document.body.classList.contains('dark-mode');
+                localStorage.setItem('theme', isDark ? 'dark' : 'light');
+                const icon = document.querySelector('#themeToggle i');
+                icon.className = isDark ? 'fas fa-sun' : 'fas fa-moon';
+            });
+
+            document.getElementById('logoutBtn').addEventListener('click', function () {
+                localStorage.removeItem('currentUser');
+                window.location.href = 'index.html';
+            });
+
+            // System control buttons
+            document.getElementById('systemRestart').addEventListener('click', function () {
+                if (confirm('Are you sure you want to restart the monitoring system?')) {
+                    logDebug('System restart initiated...', 'info');
+                }
+            });
+
+            document.getElementById('backupSystem').addEventListener('click', function () {
+                logDebug('System backup started...', 'info');
+            });
+
+            document.getElementById('addUser').addEventListener('click', function () {
+                logDebug('Opening user creation panel...', 'info');
+            });
+
+            document.getElementById('systemSettings').addEventListener('click', function () {
+                logDebug('Opening system settings...', 'info');
+            });
+
+            document.getElementById('viewUsers').addEventListener('click', function () {
+                logDebug('Displaying all users...', 'info');
+            });
+
+            document.getElementById('createUser').addEventListener('click', function () {
+                logDebug('Opening user creation form...', 'info');
+            });
+
+            document.getElementById('auditLogs').addEventListener('click', function () {
+                logDebug('Displaying audit logs...', 'info');
+            });
+        }
+
+        // Diagnostic Functions
+        function runInitialDiagnostics() {
+            logDebug('Running initial system diagnostics...');
+            testBackend();
+            setTimeout(testWebSocket, 1000);
+        }
+
+        function testCamera() {
+            logDebug('Testing camera connection...');
+            updateHealthIndicator('cameraStatus', 'warning');
+
+            // Test manual image display first
+            const testImage = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjQwIiBoZWlnaHQ9IjQ4MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICA8cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjMGE1NmEyIi8+CiAgPHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIyNCIgZmlsbD0id2hpdGUiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIj5DYW1lcmEgVGVzdDwvdGV4dD4KPC9zdmc+';
+
+            const videoPreview = document.getElementById('videoPreview');
+            const placeholder = document.getElementById('videoPlaceholder');
+
+            videoPreview.src = testImage;
+            videoPreview.style.display = 'block';
+            placeholder.style.display = 'none';
+
+            logDebug('Test image displayed - Basic HTML working', 'success');
+            updateHealthIndicator('cameraStatus', 'good');
+        }
+
+        function testWebSocket() {
+            logDebug('Testing WebSocket connection...');
+            updateHealthIndicator('websocketStatus', 'warning');
+
+            if (socket && socket.connected) {
+                logDebug('WebSocket already connected', 'success');
+                updateHealthIndicator('websocketStatus', 'good');
+                socket.emit('admin_test', { message: 'Admin diagnostic test' });
+            } else {
+                logDebug('Initializing WebSocket connection...');
+                initWebSocket();
+            }
+        }
+
+        function testBackend() {
+            logDebug('Testing backend API connectivity...');
+            updateHealthIndicator('backendStatus', 'warning');
+
+            fetch('http://localhost:8000/api/patient')
+                .then(response => {
+                    if (response.ok) {
+                        logDebug(`Backend API responding (Status: ${response.status})`, 'success');
+                        updateHealthIndicator('backendStatus', 'good');
+                        return response.json();
+                    } else {
+                        throw new Error(`HTTP ${response.status}`);
+                    }
+                })
+                .then(data => {
+                    logDebug('Backend data retrieved successfully', 'success');
+                })
+                .catch(error => {
+                    logDebug(`Backend API error: ${error.message}`, 'error');
+                    updateHealthIndicator('backendStatus', 'error');
+                });
+        }
+
+        function testTelegram() {
+            logDebug('Testing Telegram notifications...');
+            updateHealthIndicator('telegramStatus', 'warning');
+
+            // Show loading state
+            const telegramBtn = document.querySelector('[onclick="testTelegram()"]');
+            const originalHTML = telegramBtn.innerHTML;
+            const originalBackground = telegramBtn.style.background;
+
+            telegramBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Testing...';
+            telegramBtn.disabled = true;
+
+            fetch('http://localhost:8000/api/test-telegram', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            })
+                .then(response => {
+                    console.log('Response status:', response.status);
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    console.log('Telegram response:', data);
+
+                    if (data.success) {
+                        logDebug('✅ Telegram test sent successfully! Check your Telegram app.', 'success');
+                        updateHealthIndicator('telegramStatus', 'good');
+
+                        // Success visual feedback
+                        telegramBtn.innerHTML = '<i class="fas fa-check"></i> Success!';
+                        telegramBtn.style.background = 'linear-gradient(135deg, #43A047, #2E7D32)';
+
+                    } else {
+                        logDebug(`❌ Telegram test failed: ${data.message}`, 'error');
+                        updateHealthIndicator('telegramStatus', 'error');
+
+                        telegramBtn.innerHTML = '<i class="fas fa-times"></i> Failed';
+                        telegramBtn.style.background = 'linear-gradient(135deg, #E53935, #C62828)';
+                    }
+                })
+                .catch(error => {
+                    console.error('Telegram fetch error:', error);
+                    logDebug(`❌ Telegram test error: ${error.message}`, 'error');
+                    updateHealthIndicator('telegramStatus', 'error');
+
+                    telegramBtn.innerHTML = '<i class="fas fa-times"></i> Error';
+                    telegramBtn.style.background = 'linear-gradient(135deg, #E53935, #C62828)';
+                })
+                .finally(() => {
+                    // Reset button after 3 seconds
+                    setTimeout(() => {
+                        telegramBtn.innerHTML = originalHTML;
+                        telegramBtn.style.background = originalBackground;
+                        telegramBtn.disabled = false;
+                    }, 3000);
+                });
+        }
+
+        async function startAIMonitoring() {
+            logDebug('Starting AI Monitoring system...');
+
+            try {
+                const response = await fetch('http://localhost:8000/api/start-monitoring', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+
+                const data = await response.json();
+                logDebug(`AI Monitoring started: ${data.message}`, 'success');
+
+            } catch (error) {
+                logDebug(`Error starting AI Monitoring: ${error.message}`, 'error');
+            }
+        }
+
+        async function stopAIMonitoring() {
+            logDebug('Stopping AI Monitoring system...');
+
+            try {
+                const response = await fetch('http://localhost:8000/api/stop-monitoring', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+
+                const data = await response.json();
+                logDebug(`AI Monitoring stopped: ${data.message}`, 'success');
+
+            } catch (error) {
+                logDebug(`Error stopping AI Monitoring: ${error.message}`, 'error');
+            }
+        }
+
+        // 🚀 **UPDATED CAMERA DEBUG FUNCTION** - Enhanced version
+        function debugCameraFeed() {
+            logDebug('🔍 Comprehensive camera debugging started...');
+
+            // Test 1: Check camera permissions and basic functionality
+            logDebug('Testing camera permissions and basic functionality...');
+
+            // Test if we can create a test image
+            const testImage = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjQwIiBoZWlnaHQ9IjQ4MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICA8cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjMGE1NmEyIi8+CiAgPHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIyNCIgZmlsbD0id2hpdGUiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIj5DYW1lcmEgRGVidWcgVGVzdDwvdGV4dD4KICA8dGV4dCB4PSI1MCUiIHk9IjU1JSIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjE0IiBmaWxsPSJ3aGl0ZSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPkFkbWluIFBhbmVsPC90ZXh0Pgo8L3N2Zz4=';
+
+            const videoPreview = document.getElementById('videoPreview');
+            const placeholder = document.getElementById('videoPlaceholder');
+
+            videoPreview.src = testImage;
+            videoPreview.style.display = 'block';
+            placeholder.style.display = 'none';
+
+            logDebug('✅ Test image displayed - HTML/CSS working', 'success');
+
+            // Test 2: Start AI monitoring to activate camera
+            logDebug('Starting AI monitoring to activate camera...');
+            startAIMonitoring();
+
+            // Test 3: Monitor WebSocket for camera events
+            let framesReceived = 0;
+            const frameListener = (data) => {
+                framesReceived++;
+                console.log(`📹 Frame ${framesReceived} received via WebSocket`);
+                logDebug(`Frame ${framesReceived} received - Size: ${data.frame ? data.frame.length : 'N/A'}`, 'info');
+            };
+
+            socket.on('video_frame', frameListener);
+
+            // Test 4: Check for camera events
+            socket.on('camera_started', (data) => {
+                logDebug(`✅ Camera started: ${data.message}`, 'success');
+            });
+
+            socket.on('camera_error', (data) => {
+                logDebug(`❌ Camera error: ${data.message}`, 'error');
+            });
+
+            // Stop monitoring after 10 seconds
+            setTimeout(() => {
+                socket.off('video_frame', frameListener);
+
+                if (framesReceived > 0) {
+                    logDebug(`✅ Camera is working! Received ${framesReceived} frames`, 'success');
+                    updateHealthIndicator('cameraStatus', 'good');
+                } else {
+                    logDebug('❌ No camera frames received - check backend camera', 'error');
+                    updateHealthIndicator('cameraStatus', 'error');
+                }
+            }, 10000);
+        }
+
+        // WebSocket Functions
+        function initWebSocket() {
+            logDebug('Initializing WebSocket connection to backend...');
+
+            socket = io('http://localhost:8000', {
+                path: '/ws/socket.io',
+                transports: ['websocket', 'polling']
+            });
+
+            socket.on('connect', () => {
+                logDebug('WebSocket connected to backend server', 'success');
+                updateHealthIndicator('websocketStatus', 'good');
+            });
+
+            socket.on('disconnect', (reason) => {
+                logDebug(`WebSocket disconnected: ${reason}`, 'error');
+                updateHealthIndicator('websocketStatus', 'error');
+            });
+
+            socket.on('connect_error', (error) => {
+                logDebug(`WebSocket connection error: ${error.message}`, 'error');
+                updateHealthIndicator('websocketStatus', 'error');
+            });
+
+            // === CAMERA EVENTS ===
+            socket.on('camera_started', (data) => {
+                logDebug(`Camera started: ${data.message}`, 'success');
+                updateHealthIndicator('cameraStatus', 'good');
+            });
+
+            socket.on('camera_stopped', (data) => {
+                logDebug(`Camera stopped: ${data.message}`, 'info');
+                updateHealthIndicator('cameraStatus', 'warning');
+
+                // Show placeholder
+                const videoPreview = document.getElementById('videoPreview');
+                const placeholder = document.getElementById('videoPlaceholder');
+                videoPreview.style.display = 'none';
+                placeholder.style.display = 'flex';
+            });
+
+            socket.on('camera_error', (data) => {
+                logDebug(`Camera error: ${data.message}`, 'error');
+                updateHealthIndicator('cameraStatus', 'error');
+            });
+
+            socket.on('video_frame', (data) => {
+                console.log('📹 Received video frame:', data.count);
+
+                const videoPreview = document.getElementById('videoPreview');
+                const placeholder = document.getElementById('videoPlaceholder');
+
+                if (data.frame && data.frame.length > 1000) { // Check for valid frame data
+                    // Create new image element to avoid caching issues
+                    const img = new Image();
+                    img.onload = function () {
+                        console.log('✅ Video frame loaded successfully');
+
+                        // Replace the existing image
+                        videoPreview.src = this.src;
+                        videoPreview.style.display = 'block';
+                        placeholder.style.display = 'none';
+
+                        updateHealthIndicator('cameraStatus', 'good');
+                    };
+
+                    img.onerror = function () {
+                        console.log('❌ Failed to load video frame');
+                        logDebug('Failed to load video frame data', 'error');
+                        placeholder.style.display = 'flex';
+                    };
+
+                    // Set source after event handlers
+                    img.src = `data:image/jpeg;base64,${data.frame}`;
+
+                } else {
+                    console.log('❌ Invalid frame data received');
+                    placeholder.style.display = 'flex';
+                }
+            });
+
+            // === ALERT EVENTS ===
+            socket.on('new_alert', (data) => {
+                logDebug(`ALERT: ${data.alert}`, 'info');
+
+                // Add to activity log
+                const activityLogs = document.getElementById('activityLogs');
+                const newActivity = document.createElement('div');
+                newActivity.className = 'status-item';
+                newActivity.innerHTML = `
+                <span>${data.alert}</span>
+                <small>${data.timestamp}</small>
+            `;
+                activityLogs.insertBefore(newActivity, activityLogs.firstChild);
+            });
+
+            socket.on('emotion_update', (data) => {
+                logDebug(`Emotion detected: ${data.emotion}`, 'info');
+            });
+
+            socket.on('admin_test', (data) => {
+                logDebug('WebSocket test response received', 'success');
+            });
+        }
+
+        function initTheme() {
+            const savedTheme = localStorage.getItem('theme') || 'light';
+            if (savedTheme === 'dark') {
+                document.body.classList.add('dark-mode');
+                document.querySelector('#themeToggle i').className = 'fas fa-sun';
+            }
+        }
+    </script>
+
+</body>
+
+</html>
