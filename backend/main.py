@@ -53,8 +53,16 @@ from models.database import get_db, init_db, Base, engine
 from models.models import User, Patient, Vitals, Alert, AlertType, PatientStatus, SystemMetrics, UserRole
 from sqlalchemy import create_engine, text, inspect
 from models.schemas import (
-    UserLogin, TokenResponse, PatientCreate, PatientUpdate, PatientResponse,
-    VitalsCreate, VitalsResponse, AlertCreate, AlertResponse, AlertListResponse,
+    UserLogin, Token, TokenResponse, 
+    PatientCreate, PatientUpdate, PatientResponse, PatientDetailResponse,
+    VitalsCreate, VitalsResponse,
+    UserCreate, UserResponse, UserUpdate,
+    AlertCreate, AlertResponse, AlertListResponse,
+    MedicalRecordCreate, MedicalRecordResponse,
+    ConsultationCreate, ConsultationResponse,
+    AppointmentCreate, AppointmentUpdate, AppointmentResponse,
+    MessageCreate, MessageResponse,
+    TaskCreate, TaskUpdate, TaskResponse,
     MonitoringStatus, HealthCheck, SystemPerformance, PatientTrends
 )
 from auth.jwt_handler import create_token_response, decode_token, create_refresh_token
@@ -63,6 +71,12 @@ from dependencies import get_current_user, require_admin, require_doctor_or_admi
 from crud.patient_crud import PatientCRUD, get_patient_crud
 from crud.vitals_crud import VitalsCRUD, get_vitals_crud
 from crud.alert_crud import AlertCRUD, get_alert_crud
+from crud.user_crud import UserCRUD
+from crud.consultations import ConsultationCRUD
+from crud.medical_records import MedicalRecordCRUD
+from crud.appointments import AppointmentCRUD
+from crud.message_crud import MessageCRUD
+from crud.task_crud import TaskCRUD
 
 
 # ==================== Configuration ====================
@@ -137,8 +151,8 @@ def init_computer_vision():
         MEDIAPIPE_AVAILABLE = True
         print("✅ MediaPipe loaded successfully")
         return True
-    except ImportError as e:
-        print(f"⚠️ MediaPipe not available: {e}")
+    except (ImportError, AttributeError) as e:
+        print(f"⚠️ MediaPipe not available or error during initialization: {e}")
         MEDIAPIPE_AVAILABLE = False
         return False
 
@@ -668,6 +682,99 @@ async def logout(current_user: User = Depends(get_current_user)):
     return {"message": "Successfully logged out"}
 
 
+# ==================== User Management Routes ====================
+
+@app.get("/api/users", response_model=List[UserResponse], tags=["Users"])
+async def get_users(
+    skip: int = 0,
+    limit: int = 100,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin)
+):
+    """Get all users (Admin only)."""
+    user_crud = UserCRUD(db)
+    return user_crud.get_users(skip=skip, limit=limit)
+
+
+@app.post("/api/users", response_model=UserResponse, tags=["Users"])
+async def create_user(
+    user: UserCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin)
+):
+    """Create a new user (Admin only)."""
+    user_crud = UserCRUD(db)
+    db_user = user_crud.get_user_by_username(user.username)
+    if db_user:
+        raise HTTPException(status_code=400, detail="Username already registered")
+    return user_crud.create_user(user)
+
+
+@app.put("/api/users/{user_id}", response_model=UserResponse, tags=["Users"])
+async def update_user(
+    user_id: int,
+    user_update: UserUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin)
+):
+    """Update a user (Admin only)."""
+    user_crud = UserCRUD(db)
+    db_user = user_crud.update_user(user_id, user_update)
+    if not db_user:
+        raise HTTPException(status_code=404, detail="User not found")
+    return db_user
+
+
+@app.delete("/api/users/{user_id}", response_model=UserResponse, tags=["Users"])
+async def delete_user(
+    user_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin)
+):
+    """Delete a user (Admin only)."""
+    user_crud = UserCRUD(db)
+    db_user = user_crud.delete_user(user_id)
+    if not db_user:
+        raise HTTPException(status_code=404, detail="User not found")
+    return db_user
+
+
+# ==================== System & Reports Routes ====================
+
+@app.get("/api/settings", tags=["System"])
+async def get_system_settings(
+    current_user: User = Depends(require_admin)
+):
+    """Get system settings (Mock)."""
+    return {
+        "maintenance_mode": False,
+        "allow_registrations": True,
+        "alert_threshold": "High",
+        "data_retention_days": 30
+    }
+
+
+@app.post("/api/settings", tags=["System"])
+async def update_system_settings(
+    settings: dict,
+    current_user: User = Depends(require_admin)
+):
+    """Update system settings (Mock)."""
+    return {"message": "Settings updated successfully", "settings": settings}
+
+
+@app.get("/api/reports/download", tags=["Reports"])
+async def download_report(
+    report_type: str = Query(..., description="Type of report: activity, patients, alerts"),
+    days: int = Query(7),
+    current_user: User = Depends(require_admin)
+):
+    """Download system report (Mock)."""
+    # In a real app, this would generate a PDF/CSV file
+    return {"message": f"Report '{report_type}' for last {days} days generated successfully.", "download_url": "#"}
+
+
+
 # ==================== Patient Routes ====================
 
 @app.get("/api/patient", response_model=dict, tags=["Patients"])
@@ -701,6 +808,225 @@ async def get_patients(
     patient_crud = PatientCRUD(db)
     patients = patient_crud.get_multi(skip=skip, limit=limit, status=status)
     return [patient_crud.to_response(p) for p in patients]
+
+
+# ==================== Consultation Routes ====================
+
+@app.post("/api/consultations", response_model=ConsultationResponse, tags=["Consultations"])
+async def create_consultation(
+    consultation: ConsultationCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_doctor_or_admin)
+):
+    """Create a new consultation."""
+    crud = ConsultationCRUD(db)
+    return crud.create(consultation)
+
+@app.get("/api/consultations", response_model=List[ConsultationResponse], tags=["Consultations"])
+async def get_consultations(
+    skip: int = 0,
+    limit: int = 100,
+    patient_id: Optional[int] = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Get consultations."""
+    crud = ConsultationCRUD(db)
+    return crud.get_multi(skip=skip, limit=limit, patient_id=patient_id)
+
+# ==================== Medical Record Routes ====================
+
+@app.post("/api/medical_records", response_model=MedicalRecordResponse, tags=["Medical Records"])
+async def create_medical_record(
+    record: MedicalRecordCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_doctor_or_admin)
+):
+    """Upload a medical record."""
+    crud = MedicalRecordCRUD(db)
+    return crud.create(record)
+
+@app.get("/api/medical_records", response_model=List[MedicalRecordResponse], tags=["Medical Records"])
+async def get_medical_records(
+    skip: int = 0,
+    limit: int = 100,
+    patient_id: Optional[int] = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Get medical records."""
+    crud = MedicalRecordCRUD(db)
+    return crud.get_multi(skip=skip, limit=limit, patient_id=patient_id)
+
+# ==================== Schedule/Appointment Routes ====================
+
+@app.post("/api/appointments", response_model=AppointmentResponse, tags=["Schedule"])
+async def create_appointment(
+    appointment: AppointmentCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_doctor_or_admin)
+):
+    """Create a new appointment."""
+    crud = AppointmentCRUD(db)
+    return crud.create(appointment)
+
+@app.get("/api/appointments", response_model=List[AppointmentResponse], tags=["Schedule"])
+async def get_appointments(
+    skip: int = 0,
+    limit: int = 100,
+    doctor_id: Optional[int] = None,
+    patient_id: Optional[int] = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Get appointments."""
+    crud = AppointmentCRUD(db)
+    return crud.get_multi(skip=skip, limit=limit, doctor_id=doctor_id, patient_id=patient_id)
+
+@app.put("/api/appointments/{appointment_id}", response_model=AppointmentResponse, tags=["Schedule"])
+async def update_appointment(
+    appointment_id: int,
+    appointment_update: AppointmentUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_doctor_or_admin)
+):
+    """Update an appointment."""
+    crud = AppointmentCRUD(db)
+    updated = crud.update(appointment_id, appointment_update)
+    if not updated:
+        raise HTTPException(status_code=404, detail="Appointment not found")
+    return updated
+
+@app.delete("/api/appointments/{appointment_id}", response_model=AppointmentResponse, tags=["Schedule"])
+async def delete_appointment(
+    appointment_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_doctor_or_admin)
+):
+    """Delete an appointment."""
+    crud = AppointmentCRUD(db)
+    deleted = crud.delete(appointment_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Appointment not found")
+    return deleted
+
+
+# ==================== Message Routes ====================
+
+@app.post("/api/messages", response_model=MessageResponse, tags=["Messages"])
+async def send_message(
+    message: MessageCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Send a new message."""
+    crud = MessageCRUD(db)
+    # Verify recipient exists
+    user_crud = UserCRUD(db)
+    if not user_crud.get_user(message.recipient_id):
+        raise HTTPException(status_code=404, detail="Recipient not found")
+        
+    return crud.create(message, current_user.id)
+
+@app.get("/api/messages", response_model=List[MessageResponse], tags=["Messages"])
+async def get_my_messages(
+    skip: int = 0,
+    limit: int = 100,
+    unread_only: bool = False,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Get messages for the current user."""
+    crud = MessageCRUD(db)
+    return crud.get_user_messages(current_user.id, skip=skip, limit=limit, unread_only=unread_only)
+
+@app.get("/api/messages/sent", response_model=List[MessageResponse], tags=["Messages"])
+async def get_sent_messages(
+    skip: int = 0,
+    limit: int = 100,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Get messages sent by the current user."""
+    crud = MessageCRUD(db)
+    return crud.get_sent_messages(current_user.id, skip=skip, limit=limit)
+
+@app.put("/api/messages/{message_id}/read", response_model=MessageResponse, tags=["Messages"])
+async def mark_message_read(
+    message_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Mark a message as read."""
+    crud = MessageCRUD(db)
+    message = crud.mark_as_read(message_id, current_user.id)
+    if not message:
+        raise HTTPException(status_code=404, detail="Message not found or you are not the recipient")
+    return message
+
+
+# ==================== Task Routes ====================
+
+@app.post("/api/tasks", response_model=TaskResponse, tags=["Tasks"])
+async def create_task(
+    task: TaskCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Create a new task."""
+    crud = TaskCRUD(db)
+    return crud.create(task)
+
+@app.get("/api/tasks", response_model=List[TaskResponse], tags=["Tasks"])
+async def get_tasks(
+    skip: int = 0,
+    limit: int = 100,
+    assigned_to: Optional[int] = None,
+    patient_id: Optional[int] = None,
+    status: Optional[str] = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Get tasks with filtering."""
+    crud = TaskCRUD(db)
+    # If nurse, filter by their ID unless they want to see all
+    # For now, let's allow seeing all tasks if no filter provided, 
+    # or we could enforce "my tasks" by default. 
+    # Let's stick to filters provided by frontend.
+    return crud.get_all(
+        skip=skip, 
+        limit=limit, 
+        assigned_to=assigned_to, 
+        patient_id=patient_id, 
+        status=status
+    )
+
+@app.put("/api/tasks/{task_id}", response_model=TaskResponse, tags=["Tasks"])
+async def update_task(
+    task_id: int,
+    task_update: TaskUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Update a task."""
+    crud = TaskCRUD(db)
+    updated = crud.update(task_id, task_update)
+    if not updated:
+        raise HTTPException(status_code=404, detail="Task not found")
+    return updated
+
+@app.delete("/api/tasks/{task_id}", response_model=dict, tags=["Tasks"])
+async def delete_task(
+    task_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Delete a task."""
+    crud = TaskCRUD(db)
+    success = crud.delete(task_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Task not found")
+    return {"message": "Task deleted successfully"}
 
 
 @app.post("/api/patients", response_model=dict, tags=["Patients"])
@@ -764,16 +1090,45 @@ async def get_alerts(
     db: Session = Depends(get_db)
 ):
     """Get alerts with optional filtering."""
-    alert_crud = AlertCRUD(db)
-    alerts = alert_crud.get_all(hours=hours, acknowledged=acknowledged, severity_min=severity_min)
-    
-    unacknowledged = alert_crud.get_unacknowledged()
-    
-    return AlertListResponse(
-        alerts=[alert_crud.to_response(a) for a in alerts],
-        total_count=len(alerts),
-        unacknowledged_count=len(unacknowledged)
-    )
+    try:
+        alert_crud = AlertCRUD(db)
+        alerts = alert_crud.get_all(hours=hours, acknowledged=acknowledged, severity_min=severity_min)
+        
+        # Safely get unacknowledged count
+        try:
+            unacknowledged = alert_crud.get_unacknowledged()
+            unacknowledged_count = len(unacknowledged)
+        except Exception as e:
+            print(f"❌ Error getting unacknowledged count: {e}")
+            unacknowledged_count = 0
+        
+        # Safely convert alerts to response model
+        valid_alerts = []
+        for alert in alerts:
+            try:
+                alert_dict = alert_crud.to_response(alert)
+                # Pre-validate to skip bad data
+                AlertResponse(**alert_dict)
+                valid_alerts.append(alert_dict)
+            except Exception as e:
+                print(f"❌ Error validating alert {alert.id if hasattr(alert, 'id') else 'unknown'}: {e}")
+                continue
+
+        return AlertListResponse(
+            alerts=valid_alerts,
+            total_count=len(valid_alerts),
+            unacknowledged_count=unacknowledged_count
+        )
+    except Exception as e:
+        print(f"🔥 CRITICAL ERROR in get_alerts: {e}")
+        import traceback
+        traceback.print_exc()
+        return AlertListResponse(
+            alerts=[],
+            total_count=0,
+            unacknowledged_count=0
+        )
+        return AlertListResponse(alerts=[], total_count=0, unacknowledged_count=0)
 
 
 @app.post("/api/alerts/acknowledge/{alert_id}", response_model=dict, tags=["Alerts"])

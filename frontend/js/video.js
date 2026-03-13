@@ -1,6 +1,6 @@
 // video.js - Handle real-time video streaming with MediaPipe landmarks
 const socket = io({
-    path: '/ws/socket.io'
+    path: '/socket.io'
 });
 
 let videoContainer = null;

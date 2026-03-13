@@ -110,6 +110,9 @@ class Patient(Base):
     alerts = relationship("Alert", back_populates="patient", order_by="desc(Alert.timestamp)")
     primary_doctor = relationship("User", foreign_keys=[primary_doctor_id])
     primary_nurse = relationship("User", foreign_keys=[primary_nurse_id])
+    consultations = relationship("Consultation", back_populates="patient", order_by="desc(Consultation.consultation_date)")
+    medical_records = relationship("MedicalRecord", back_populates="patient", order_by="desc(MedicalRecord.date_recorded)")
+    appointments = relationship("Appointment", back_populates="patient", order_by="desc(Appointment.start_time)")
     
     def __repr__(self):
         return f"<Patient {self.patient_id}: {self.first_name} {self.last_name}>"
@@ -248,4 +251,121 @@ class SystemMetrics(Base):
     
     def __repr__(self):
         return f"<SystemMetrics at {self.recorded_at}>"
+
+
+class Consultation(Base):
+    """Consultation records"""
+    
+    __tablename__ = "consultations"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    patient_id = Column(Integer, ForeignKey("patients.id"), nullable=False)
+    doctor_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    consultation_date = Column(DateTime(timezone=True), server_default=func.now())
+    notes = Column(Text, nullable=False)
+    diagnosis = Column(String(255), nullable=True)
+    prescription = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    
+    # Relationships
+    patient = relationship("Patient", back_populates="consultations")
+    doctor = relationship("User", foreign_keys=[doctor_id])
+    
+    def __repr__(self):
+        return f"<Consultation for Patient {self.patient_id} by Doctor {self.doctor_id} on {self.consultation_date}>"
+
+
+class MedicalRecord(Base):
+    """Medical records (files/documents)"""
+    
+    __tablename__ = "medical_records"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    patient_id = Column(Integer, ForeignKey("patients.id"), nullable=False)
+    uploaded_by = Column(Integer, ForeignKey("users.id"), nullable=False)
+    record_type = Column(String(50), nullable=False)  # e.g., "Lab Report", "X-Ray", "Prescription"
+    file_url = Column(String(255), nullable=False) # In a real app, this would be a URL to S3 or similar
+    description = Column(Text, nullable=True)
+    date_recorded = Column(DateTime(timezone=True), server_default=func.now())
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    # Relationships
+    patient = relationship("Patient", back_populates="medical_records")
+    uploader = relationship("User", foreign_keys=[uploaded_by])
+    
+    def __repr__(self):
+        return f"<MedicalRecord {self.record_type} for Patient {self.patient_id}>"
+
+
+class Appointment(Base):
+    """Schedule/Appointments"""
+    
+    __tablename__ = "appointments"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    patient_id = Column(Integer, ForeignKey("patients.id"), nullable=True) # Could be null if blocked time
+    doctor_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    title = Column(String(100), nullable=False)
+    description = Column(Text, nullable=True)
+    start_time = Column(DateTime(timezone=True), nullable=False)
+    end_time = Column(DateTime(timezone=True), nullable=False)
+    status = Column(String(20), default="scheduled") # scheduled, completed, cancelled
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    
+    # Relationships
+    patient = relationship("Patient", back_populates="appointments")
+    doctor = relationship("User", foreign_keys=[doctor_id])
+    
+    def __repr__(self):
+        return f"<Appointment {self.title} with Doctor {self.doctor_id} at {self.start_time}>"
+
+
+class Message(Base):
+    """Internal messaging system"""
+    
+    __tablename__ = "messages"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    sender_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    recipient_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    subject = Column(String(200), nullable=True)
+    body = Column(Text, nullable=False)
+    is_read = Column(Boolean, default=False)
+    timestamp = Column(DateTime(timezone=True), server_default=func.now())
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    # Relationships
+    sender = relationship("User", foreign_keys=[sender_id])
+    recipient = relationship("User", foreign_keys=[recipient_id])
+    
+
+    def __repr__(self):
+        return f"<Message {self.id} from {self.sender_id} to {self.recipient_id}>"
+
+
+class Task(Base):
+    """Nursing tasks"""
+    
+    __tablename__ = "tasks"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    title = Column(String(200), nullable=False)
+    description = Column(Text, nullable=True)
+    assigned_to = Column(Integer, ForeignKey("users.id"), nullable=False)
+    patient_id = Column(Integer, ForeignKey("patients.id"), nullable=True)
+    status = Column(String(20), default="pending") # pending, in-progress, completed
+    priority = Column(String(20), default="medium") # low, medium, high
+    due_date = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    
+    # Relationships
+    assignee = relationship("User", foreign_keys=[assigned_to])
+    patient = relationship("Patient")
+    
+    def __repr__(self):
+        return f"<Task {self.title} for {self.patient_id}>"
+
 

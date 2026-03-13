@@ -57,6 +57,12 @@ class TokenResponse(BaseModel):
     user: UserResponse
 
 
+class Token(BaseModel):
+    """Schema for token request"""
+    access_token: str
+    token_type: str
+
+
 class TokenData(BaseModel):
     """Schema for JWT token payload"""
     user_id: Optional[int] = None
@@ -127,6 +133,9 @@ class PatientDetailResponse(PatientResponse):
     notes: Optional[str] = None
     current_vitals: Optional[dict] = None
     recent_alerts: List["AlertResponse"] = []
+    consultations: List["ConsultationResponse"] = []
+    medical_records: List["MedicalRecordResponse"] = []
+    appointments: List["AppointmentResponse"] = []
 
 
 # ==================== Vitals Schemas ====================
@@ -316,6 +325,148 @@ class VideoFrameResponse(BaseModel):
     emotions_detected: List[str] = []
     movement_detected: bool = False
     landmarks_count: int = 0
+
+
+
+# ==================== Consultation Schemas ====================
+
+class ConsultationBase(BaseModel):
+    """Base consultation schema"""
+    patient_id: int
+    doctor_id: int
+    notes: str
+    diagnosis: Optional[str] = None
+    prescription: Optional[str] = None
+
+class ConsultationCreate(ConsultationBase):
+    """Schema for creating a consultation"""
+    pass
+
+class ConsultationResponse(ConsultationBase):
+    """Schema for consultation response"""
+    id: int
+    consultation_date: datetime
+    created_at: datetime
+    updated_at: datetime
+    
+    model_config = ConfigDict(from_attributes=True)
+
+
+# ==================== Medical Record Schemas ====================
+
+class MedicalRecordBase(BaseModel):
+    """Base medical record schema"""
+    patient_id: int
+    uploaded_by: int
+    record_type: str
+    file_url: str
+    description: Optional[str] = None
+
+class MedicalRecordCreate(MedicalRecordBase):
+    """Schema for creating a medical record"""
+    pass
+
+class MedicalRecordResponse(MedicalRecordBase):
+    """Schema for medical record response"""
+    id: int
+    date_recorded: datetime
+    created_at: datetime
+    
+    model_config = ConfigDict(from_attributes=True)
+
+
+# ==================== Appointment Schemas ====================
+
+class AppointmentBase(BaseModel):
+    """Base appointment schema"""
+    patient_id: Optional[int] = None
+    doctor_id: int
+    title: str
+    description: Optional[str] = None
+    start_time: datetime
+    end_time: datetime
+    status: str = "scheduled"
+
+class AppointmentCreate(AppointmentBase):
+    """Schema for creating an appointment"""
+    pass
+
+class AppointmentUpdate(BaseModel):
+    """Schema for updating an appointment"""
+    title: Optional[str] = None
+    description: Optional[str] = None
+    start_time: Optional[datetime] = None
+    end_time: Optional[datetime] = None
+    status: Optional[str] = None
+
+class AppointmentResponse(AppointmentBase):
+    """Schema for appointment response"""
+    id: int
+    created_at: datetime
+    updated_at: datetime
+    
+    model_config = ConfigDict(from_attributes=True)
+
+
+# ==================== Message Schemas ====================
+
+class MessageBase(BaseModel):
+    """Base message schema"""
+    recipient_id: int
+    subject: Optional[str] = None
+    body: str
+
+class MessageCreate(MessageBase):
+    """Schema for creating a message"""
+    pass
+
+class MessageResponse(MessageBase):
+    """Schema for message response"""
+    id: int
+    sender_id: int
+    sender_name: Optional[str] = None
+    is_read: bool
+    timestamp: datetime
+    created_at: datetime
+    
+    model_config = ConfigDict(from_attributes=True)
+
+
+
+# ==================== Task Schemas ====================
+
+class TaskBase(BaseModel):
+    """Base task schema"""
+    title: str
+    description: Optional[str] = None
+    patient_id: Optional[int] = None
+    priority: str = "medium"
+    status: str = "pending"
+    due_date: Optional[datetime] = None
+
+class TaskCreate(TaskBase):
+    """Schema for creating a task"""
+    assigned_to: int
+
+class TaskUpdate(BaseModel):
+    """Schema for updating a task"""
+    title: Optional[str] = None
+    description: Optional[str] = None
+    status: Optional[str] = None
+    priority: Optional[str] = None
+    due_date: Optional[datetime] = None
+    assigned_to: Optional[int] = None
+
+class TaskResponse(TaskBase):
+    """Schema for task response"""
+    id: int
+    assigned_to: int
+    assignee_name: Optional[str] = None
+    patient_name: Optional[str] = None
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+    
+    model_config = ConfigDict(from_attributes=True)
 
 
 # Update forward references
